@@ -1,0 +1,53 @@
+name: Run live council debate
+on:
+  workflow_dispatch:
+    inputs:
+      mission:
+        description: Public debate mission (12–3000 characters)
+        required: true
+        type: string
+      confirm_public:
+        description: I agree that the mission and transcript can be visible to repository readers
+        required: true
+        type: boolean
+        default: false
+      confirm_free_settings:
+        description: The OpenRouter key uses shared capacity without BYOK or enforced paid plugins
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-council-debate
+  cancel-in-progress: false
+
+jobs:
+  debate:
+    if: >-
+      github.repository == '0eroiQ/ai-fight-club' && github.ref == 'refs/heads/main'
+      && inputs.confirm_public && inputs.confirm_free_settings
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Run one free-model debate
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEBATE_MISSION: ${{ inputs.mission }}
+        run: node server/actions-debate.js
+      - name: Save transcript
+        if: "!cancelled()"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: council-debate-${{ github.run_attempt }}
+          path: debate.json
+          retention-days: 7
+          if-no-files-found: ignore
