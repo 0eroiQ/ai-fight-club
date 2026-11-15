@@ -3,85 +3,50 @@ on:
   workflow_dispatch:
     inputs:
       mission:
-        description: Public debate mission (12–3000 characters). Leave blank to resume.
         required: false
         type: string
       resume_run_id:
-        description: Run ID of an interrupted debate on main. Leave blank for a new debate.
         required: false
         type: string
       confirm_public:
-        description: I agree that the mission and transcript can be visible to repository readers
         required: true
         type: boolean
-        default: false
       confirm_free_settings:
-        description: The OpenRouter key uses shared capacity without BYOK or enforced paid plugins
         required: true
         type: boolean
-        default: false
-
 permissions:
   contents: read
-  actions: read
-
-concurrency:
-  group: live-council-debate
-  cancel-in-progress: false
-
 jobs:
-  debate:
+  browser-validation:
     if: >-
-      github.repository == '0eroiQ/ai-fight-club' && github.ref == 'refs/heads/main'
-      && inputs.confirm_public && inputs.confirm_free_settings
+      github.repository == '0eroiQ/ai-fight-club'
+      && github.ref == 'refs/heads/codex/verify-live-dashboard-bridge'
+      && github.actor == '0eroiQ' && inputs.confirm_public && inputs.confirm_free_settings
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 14
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Download the interrupted debate
-        if: inputs.resume_run_id != ''
+      - name: Prepare isolated HTTPS browser test
         env:
-          GH_TOKEN: ${{ github.token }}
-          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+          VITE_COUNCIL_BRIDGE_ORIGIN: https://bridge.example.test:9443
         run: |
-          if [[ ! "$RESUME_RUN_ID" =~ ^[1-9][0-9]{0,19}$ || "$RESUME_RUN_ID" == "$GITHUB_RUN_ID" ]]; then
-            echo "Enter the numeric ID of a previous debate run."
-            exit 1
-          fi
-
-          if ! attempt=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RESUME_RUN_ID" |
-            jq -er --arg repository "$GITHUB_REPOSITORY" '
-              select(.event == "workflow_dispatch" and .head_branch == "main" and
-                .path == ".github/workflows/live-debate.yml" and .status == "completed" and
-                .head_repository.full_name == $repository and
-                (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")) |
-              .run_attempt | select(type == "number" and . >= 1)
-            '); then
-            echo "Select a completed, interrupted council debate on main."
-            exit 1
-          fi
-
-          if ! gh run download "$RESUME_RUN_ID" --repo "$GITHUB_REPOSITORY" \
-            --name "council-debate-$attempt" --dir resume; then
-            echo "This attempt has no downloadable debate transcript."
-            exit 1
-          fi
-      - name: Run one free-model debate
+          npm install --no-audit --no-fund --no-save --no-package-lock playwright@1.65.1
+          npx playwright install --with-deps chromium
+          openssl req -x509 -newkey rsa:2048 -nodes -keyout validation/key.pem -out validation/cert.pem -sha256 -days 1 -subj '/CN=bridge.example.test' >/dev/null 2>&1
+          npm run build
+      - name: Verify real free debate in the HTTPS dashboard
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          DEBATE_MISSION: ${{ inputs.mission }}
-          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
-        run: node server/actions-debate.js
-      - name: Save transcript
-        if: "!cancelled()"
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        run: node validation/browser.mjs
+      - name: Save verification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: council-debate-${{ github.run_attempt }}
-          path: debate.json
+          name: bridge-browser-proof
+          path: bridge-browser-proof.json
+          if-no-files-found: error
           retention-days: 7
-          if-no-files-found: ignore
