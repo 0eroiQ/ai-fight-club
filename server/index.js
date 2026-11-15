@@ -15,7 +15,7 @@ function json(res, status, value) {
   res.end(JSON.stringify(value));
 }
 
-async function readMission(req) {
+async function readDebateRequest(req) {
   let body = '';
   req.setEncoding('utf8');
   for await (const chunk of req) {
@@ -23,7 +23,7 @@ async function readMission(req) {
     if (body.length > 20_000) return null;
   }
   try {
-    return JSON.parse(body)?.mission;
+    return JSON.parse(body);
   } catch {
     return null;
   }
@@ -53,9 +53,13 @@ export function createDashboard({ apiKey, fetchModel }) {
       const controller = new AbortController();
       res.on('close', () => controller.abort());
       try {
-        const mission = await readMission(req);
+        const request = await readDebateRequest(req);
+        const mission = request?.mission;
         if (typeof mission !== 'string' || mission.length > 3000 || validateRequest(mission)) {
           return json(res, 400, { error: 'Enter a mission between 12 and 3000 characters.' });
+        }
+        if (request.approvePaid !== true) {
+          return json(res, 400, { error: 'Confirm OpenRouter charges before starting a local debate.' });
         }
 
         res.writeHead(200, {
