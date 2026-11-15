@@ -18,7 +18,7 @@ const freeModels = {
   ux: 'baidu/ernie-5.5-flash-preview:free',
   critic: 'google/gemma-4-31b-it:free',
   qa: 'google/gemma-4-26b-a4b-it:free',
-  security: 'inclusionai/ling-3.2-flash:free',
+  security: 'dots-studio/dots-3-note-preview:free',
 };
 
 const freeRouting = {
