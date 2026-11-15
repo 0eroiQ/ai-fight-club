@@ -18,7 +18,7 @@ const freeModels = {
   ux: 'baidu/ernie-5.5-flash-preview:free',
   critic: 'nvidia/nemotron-3-ultra-550b-a55b:free',
   qa: 'recursive/flint-v1.0:free',
-  security: 'inclusionai/ling-3.2-flash:free',
+  security: 'dots-studio/dots-3-note-preview:free',
 };
 
 const freeRouting = {
@@ -26,9 +26,11 @@ const freeRouting = {
   plugins: [{ id: 'web', enabled: false }],
 };
 
-export async function* runDebate(mission, { apiKey, signal, fetchModel = fetch, freeOnly = false }) {
-  const transcript = [];
-  for (const [agentId, localModel, tag, assignment] of turns) {
+export async function* runDebate(mission, { apiKey, signal, fetchModel = fetch, freeOnly = false, previous = [] }) {
+  const transcript = previous.map(({agentId, model, message}) => ({
+    agent: model, role: AGENTS.find(agent => agent.id === agentId).role, reply: message,
+  }));
+  for (const [agentId, localModel, tag, assignment] of turns.slice(previous.length)) {
     const model = freeOnly ? freeModels[agentId] : localModel;
     if (freeOnly && !model?.endsWith(':free')) throw new Error('A free model is required for each council role.');
     const agent = AGENTS.find(candidate => candidate.id === agentId);

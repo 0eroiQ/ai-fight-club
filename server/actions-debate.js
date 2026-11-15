@@ -1,13 +1,14 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { validateRequest } from '../src/council.js';
 import { runDebate } from './debate.js';
 
-export async function collectActionsDebate({ mission, apiKey, fetchModel }) {
-  const events = [];
+export async function collectActionsDebate({ mission, apiKey, fetchModel, previous = [] }) {
+  const events = [...previous];
   for await (const event of runDebate(mission, {
     apiKey,
     fetchModel,
+    previous,
     freeOnly: true,
     signal: AbortSignal.timeout(8 * 60_000),
   })) {
@@ -30,7 +31,10 @@ async function main() {
     console.error('Enter a public mission between 12 and 3000 characters, without credentials.');
     return 1;
   }
-  const transcript = await collectActionsDebate({ mission, apiKey });
+  const prefix = JSON.parse(await readFile('resume/debate.json', 'utf8'));
+  const previous = prefix.events.filter(event => event.type === 'message');
+  if (prefix.version !== 1 || prefix.mission !== mission || previous.length !== 5) throw new Error('Unexpected prefix.');
+  const transcript = await collectActionsDebate({ mission, apiKey, previous });
   await writeFile('debate.json', JSON.stringify(transcript, null, 2) + '\n', { flag: 'wx' });
   if (transcript.events.at(-1)?.type !== 'complete') {
     console.error('The council was interrupted. See the transcript artifact for available replies.');

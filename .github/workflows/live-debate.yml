@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: live-council-debate
@@ -39,6 +40,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
+      - name: Retrieve the verified five-reply transcript
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43703741255 --repo "$GITHUB_REPOSITORY" --name council-debate-1 --dir resume
+          printf '%s  %s\n' '87b26bc1322c3085801bc5f8a6987ae1da08ce2643d9112305d6a108af12d3cf' resume/debate.json | sha256sum -c -
       - name: Run one free-model debate
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
