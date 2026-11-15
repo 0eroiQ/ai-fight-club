@@ -26,14 +26,33 @@ const freeRouting = {
   plugins: [{ id: 'web', enabled: false }],
 };
 
-export async function* runDebate(mission, { apiKey, signal, fetchModel = fetch, freeOnly = false }) {
-  const transcript = [];
-  for (const [agentId, localModel, tag, assignment] of turns) {
+export function interruptedReplies(events, apiKey) {
+  const invalid = new Error('The saved transcript does not contain an interrupted free debate.');
+  if (!Array.isArray(events) || events.length > turns.length || events.at(-1)?.type !== 'error') throw invalid;
+  return events.slice(0, -1).map((event, index) => {
+    const [agentId, , tag] = turns[index];
+    if (event?.type !== 'message' || event.step !== index + 1 || event.agentId !== agentId ||
+        event.tag !== tag || typeof event.model !== 'string' ||
+        !/^[\w.-]+\/[\w.-]+:free$/.test(event.model) ||
+        typeof event.message !== 'string' || !event.message.trim() ||
+        event.message.length > 4000 || event.message.includes(apiKey)) throw invalid;
+    return { type: 'message', agentId, tag, step: event.step, model: event.model, message: event.message };
+  });
+}
+
+export async function* runDebate(mission, { apiKey, signal, fetchModel = fetch, freeOnly = false, previousReplies = [] }) {
+  const transcript = previousReplies.map(({ agentId, model, message }) => ({
+    agent: model,
+    role: AGENTS.find(agent => agent.id === agentId).role,
+    reply: message,
+  }));
+  for (const [agentId, localModel, tag, assignment] of turns.slice(transcript.length)) {
     const model = freeOnly ? freeModels[agentId] : localModel;
     if (freeOnly && !model?.endsWith(':free')) throw new Error('A free model is required for each council role.');
     const agent = AGENTS.find(candidate => candidate.id === agentId);
     const speaker = freeOnly ? model : agent.name;
     const localOptions = model === 'qwen/qwen3-coder-next' ? {} : { reasoning: { effort: 'low' } };
+    const freeOptions = agentId === 'architect' ? { ...freeRouting, reasoning: { enabled: false } } : freeRouting;
     const step = transcript.length + 1;
     try {
       const response = await fetchModel('https://openrouter.ai/api/v1/chat/completions', {
@@ -43,9 +62,9 @@ export async function* runDebate(mission, { apiKey, signal, fetchModel = fetch, 
         signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]),
         body: JSON.stringify({
           model,
-          max_tokens: 1400,
+          max_tokens: freeOnly ? 4000 : 1400,
           stream: false,
-          ...(freeOnly ? freeRouting : localOptions),
+          ...(freeOnly ? freeOptions : localOptions),
           messages: [
             {
               role: 'system',

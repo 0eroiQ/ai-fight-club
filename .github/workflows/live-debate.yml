@@ -3,8 +3,12 @@ on:
   workflow_dispatch:
     inputs:
       mission:
-        description: Public debate mission (12–3000 characters)
-        required: true
+        description: Public debate mission (12–3000 characters). Leave blank to resume.
+        required: false
+        type: string
+      resume_run_id:
+        description: Run ID of an interrupted debate on main. Leave blank for a new debate.
+        required: false
         type: string
       confirm_public:
         description: I agree that the mission and transcript can be visible to repository readers
@@ -19,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: live-council-debate
@@ -38,10 +43,39 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
+      - name: Download the interrupted debate
+        if: inputs.resume_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+        run: |
+          if [[ ! "$RESUME_RUN_ID" =~ ^[1-9][0-9]{0,19}$ || "$RESUME_RUN_ID" == "$GITHUB_RUN_ID" ]]; then
+            echo "Enter the numeric ID of a previous debate run."
+            exit 1
+          fi
+
+          if ! attempt=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RESUME_RUN_ID" |
+            jq -er --arg repository "$GITHUB_REPOSITORY" '
+              select(.event == "workflow_dispatch" and .head_branch == "main" and
+                .path == ".github/workflows/live-debate.yml" and .status == "completed" and
+                .head_repository.full_name == $repository and
+                (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")) |
+              .run_attempt | select(type == "number" and . >= 1)
+            '); then
+            echo "Select a completed, interrupted council debate on main."
+            exit 1
+          fi
+
+          if ! gh run download "$RESUME_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "council-debate-$attempt" --dir resume; then
+            echo "This attempt has no downloadable debate transcript."
+            exit 1
+          fi
       - name: Run one free-model debate
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           DEBATE_MISSION: ${{ inputs.mission }}
+          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
         run: node server/actions-debate.js
       - name: Save transcript
         if: "!cancelled()"
