@@ -24,6 +24,7 @@ const freeModels = {
 const freeRouting = {
   provider: { allow_fallbacks: false, max_price: { prompt: 0, completion: 0, request: 0 } },
   plugins: [{ id: 'web', enabled: false }],
+  reasoning: { enabled: false },
 };
 
 export async function* runDebate(mission, { apiKey, signal, fetchModel = fetch, freeOnly = false }) {
@@ -43,7 +44,7 @@ export async function* runDebate(mission, { apiKey, signal, fetchModel = fetch, 
         signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]),
         body: JSON.stringify({
           model,
-          max_tokens: 1400,
+          max_tokens: freeOnly ? 4000 : 1400,
           stream: false,
           ...(freeOnly ? freeRouting : localOptions),
           messages: [
