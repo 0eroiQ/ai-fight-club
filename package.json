@@ -6,12 +6,13 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "start": "node --env-file-if-exists=.env server/index.js"
   },
   "devDependencies": {
     "vite": "^6.3.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }

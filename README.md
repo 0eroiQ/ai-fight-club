@@ -1,18 +1,26 @@
 # AI Fight Club — Council Console
 
-A safe proof-of-concept dashboard for a multi-model software engineering council.
+The public GitHub Pages dashboard runs a scripted demo. The same dashboard can run privately on your machine with six live OpenRouter models.
 
-**Version 0.1 is demo-only:** agent debates are scripted simulations, not real model calls. No code is generated or deployed by the agents.
+## Run live debates
 
-Start locally:
+With Node.js 22 or later:
 
 ```bash
 npm install
-npm run dev
+npm run build
 ```
 
-Run `npm test` for unit tests and `npm run build` to generate the static site.
+In macOS Terminal (zsh), enter an OpenRouter key at the hidden prompt and start the server:
 
-Future phases: server-side OpenRouter / NVIDIA / Ollama integrations, isolated coding worktrees, automated verification, and human approval before any production change. Never commit API credentials.
+```zsh
+read -rs 'OPENROUTER_API_KEY?OpenRouter API key: '
+OPENROUTER_API_KEY="$OPENROUTER_API_KEY" npm start
+unset OPENROUTER_API_KEY
+```
 
-**Privacy note:** This repository was public when setup began. Set it to Private in GitHub Settings if desired.
+Alternatively, set `OPENROUTER_API_KEY` in the local `.env` file ignored by Git. Never set it as a `VITE_*` variable. Open [the private dashboard](http://127.0.0.1:4173/ai-fight-club/) and select **Start Live Debate**. Stop the server with Ctrl+C.
+
+The server binds to this machine only. It sends the mission and earlier replies to OpenRouter and the selected model providers. A complete debate makes seven potentially billed requests: one per model and one final synthesis from Nemotron. Replies are discussion only. An interrupted run keeps the replies already received.
+
+Use `npm run dev` for the scripted demo and `npm test` for checks. The live integration tests use simulated provider responses.
