@@ -13,7 +13,6 @@ export async function collectActionsDebate({ mission, apiKey, fetchModel, checkp
     apiKey,
     fetchModel,
     previousReplies,
-    freeOnly: true,
     signal: AbortSignal.timeout(8 * 60_000),
   })) {
     events.push(event);
