@@ -127,3 +127,61 @@ test('the Actions debate stops at a rate limit and keeps the replies it received
   assert.match(events.at(-1).message, /rate-limited/);
   assert.doesNotMatch(JSON.stringify(events), /raw provider detail/);
 });
+
+test('resuming a saved Actions debate preserves completed replies and sends only the missing turns', async () => {
+  const apiKey = 'fixture-only';
+  let attempts = 0;
+  const checkpoint = await collectActionsDebate({
+    mission, apiKey,
+    fetchModel() {
+      return ++attempts <= 5
+        ? Response.json({ choices: [{ message: { content: 'Original reply ' + attempts } }] })
+        : new Response(null, { status: 429 });
+    },
+  });
+  const saved = checkpoint.events.slice(0, -1);
+  assert.equal(saved.length, 5);
+
+  const requests = [];
+  const complete = await collectActionsDebate({
+    mission, apiKey, checkpoint: JSON.parse(JSON.stringify(checkpoint)),
+    fetchModel(_url, options) {
+      const request = JSON.parse(options.body);
+      requests.push(request);
+      assert.match(request.model, /:free$/);
+      assert.deepEqual(request.provider.max_price, { prompt: 0, completion: 0, request: 0 });
+      return Response.json({ choices: [{ message: { content: 'Resumed reply ' + requests.length } }] });
+    },
+  });
+  assert.equal(requests.length, 2);
+  assert.deepEqual(complete.events.slice(0, 5), saved);
+  assert.deepEqual(requests.map(request => JSON.parse(request.messages[1].content).transcript.map(turn => turn.reply)), [
+    saved.map(event => event.message),
+    [...saved.map(event => event.message), 'Resumed reply 1'],
+  ]);
+  assert.deepEqual(complete.events.slice(5, 7).map(({ step, tag }) => [step, tag]), [
+    [6, 'SECURITY'], [7, 'RESOLUTION'],
+  ]);
+  assert.deepEqual(complete.events.at(-1), { type: 'complete', messages: 7 });
+});
+
+test('a bad or already complete checkpoint is rejected before any model call', async () => {
+  const reply = {
+    type: 'message', agentId: 'architect', tag: 'PROPOSAL', step: 1,
+    model: 'nvidia/nemotron-3.5-lightning:free', message: 'Saved reply',
+  };
+  const failure = { type: 'error' };
+  let calls = 0;
+  for (const checkpoint of [
+    { version: 1, mission: 'A different mission with different replies', events: [reply, failure] },
+    { version: 1, mission, events: [{ ...reply, step: 2 }, failure] },
+    { version: 1, mission, events: [{ ...reply, model: 'nvidia/nemotron-3.5-lightning' }, failure] },
+    { version: 1, mission, events: [{ ...reply, message: 'abc fixture-only' }, failure] },
+    { version: 1, mission, events: [reply, { type: 'complete', messages: 7 }] },
+  ]) {
+    await assert.rejects(collectActionsDebate({
+      mission, apiKey: 'fixture-only', checkpoint, fetchModel() { calls++; },
+    }), /saved transcript/);
+  }
+  assert.equal(calls, 0);
+});

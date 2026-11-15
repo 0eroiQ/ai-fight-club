@@ -12,6 +12,14 @@ After this workflow is approved and present on the default branch:
 
 The workflow reads `OPENROUTER_API_KEY` from GitHub Actions repository secrets. Each run uses six explicit OpenRouter free model variants and a final synthesis, for at most seven calls. Price caps are zero and provider fallback is disabled. An unavailable or rate-limited model can interrupt the debate. The workflow runs on demand and publishes a transcript artifact. GitHub Pages serves static files, so the dashboard links to the authenticated GitHub Actions launch screen and reads the file you select locally.
 
+### Resume an interrupted debate
+
+1. Open the latest interrupted debate on `main`. Copy the numeric run ID from its URL after `/actions/runs/`. The run must still have its transcript artifact.
+2. Open **Run workflow** on `main`, leave **mission** blank, and enter the ID in **resume_run_id**. Check both confirmations and start the run.
+3. Download the new run's transcript and import `debate.json` into the dashboard. The transcript includes the previous replies and the remaining ones as they arrive. If it stops again, repeat with the new run ID.
+
+The workflow reuses the saved mission and starts with the first missing reply. The final synthesis receives all six earlier replies. If GitHub stops the runner before it can upload a transcript, that attempt has no file to resume from.
+
 ## Run a private live debate locally
 
 With Node.js 22 or later:
