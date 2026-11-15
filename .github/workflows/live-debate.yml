@@ -27,7 +27,8 @@ concurrency:
 jobs:
   debate:
     if: >-
-      github.repository == '0eroiQ/ai-fight-club' && github.ref == 'refs/heads/main'
+      github.repository == '0eroiQ/ai-fight-club' && github.ref == 'refs/heads/codex/free-debate-live-check'
+      && github.actor == '0eroiQ'
       && inputs.confirm_public && inputs.confirm_free_settings
     runs-on: ubuntu-latest
     timeout-minutes: 12
