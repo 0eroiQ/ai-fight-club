@@ -14,3 +14,6 @@
 #transcript-mission,.body p{white-space:pre-wrap}
 .msghead b,.body p{overflow-wrap:anywhere}
 .body{min-width:0}
+#bridge-access{margin-top:14px}
+#bridge-password{width:100%;font:inherit;font-size:13px;background:#0b1320;color:#e8eefa;border:1px solid #3c4b60;border-radius:8px;padding:11px 14px}
+#bridge-password:focus-visible{outline:2px solid #8ee3a8;outline-offset:2px}
