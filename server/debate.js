@@ -24,7 +24,6 @@ const freeModels = {
 const freeRouting = {
   provider: { allow_fallbacks: false, max_price: { prompt: 0, completion: 0, request: 0 } },
   plugins: [{ id: 'web', enabled: false }],
-  reasoning: { enabled: false },
 };
 
 export async function* runDebate(mission, { apiKey, signal, fetchModel = fetch, freeOnly = false }) {
@@ -35,6 +34,7 @@ export async function* runDebate(mission, { apiKey, signal, fetchModel = fetch, 
     const agent = AGENTS.find(candidate => candidate.id === agentId);
     const speaker = freeOnly ? model : agent.name;
     const localOptions = model === 'qwen/qwen3-coder-next' ? {} : { reasoning: { effort: 'low' } };
+    const freeOptions = agentId === 'architect' ? { ...freeRouting, reasoning: { enabled: false } } : freeRouting;
     const step = transcript.length + 1;
     try {
       const response = await fetchModel('https://openrouter.ai/api/v1/chat/completions', {
@@ -46,7 +46,7 @@ export async function* runDebate(mission, { apiKey, signal, fetchModel = fetch, 
           model,
           max_tokens: freeOnly ? 4000 : 1400,
           stream: false,
-          ...(freeOnly ? freeRouting : localOptions),
+          ...(freeOnly ? freeOptions : localOptions),
           messages: [
             {
               role: 'system',
@@ -68,7 +68,7 @@ export async function* runDebate(mission, { apiKey, signal, fetchModel = fetch, 
           403: 'OpenRouter denied the request.',
           429: 'OpenRouter rate-limited the request.',
         };
-        yield { type: 'error', agentId, model, message: messages[response.status] || 'OpenRouter returned an error.' };
+        yield { type: 'error', agentId, model, message: messages[response.status] || `OpenRouter returned HTTP ${response.status}.` };
         return;
       }
 
