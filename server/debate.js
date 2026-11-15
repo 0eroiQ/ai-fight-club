@@ -16,7 +16,7 @@ const freeModels = {
   architect: 'nvidia/nemotron-3.5-lightning:free',
   engineer: 'cohere/north-mini-code:free',
   ux: 'baidu/ernie-5.5-flash-preview:free',
-  critic: 'liquid/lfm-3-1.7b:free',
+  critic: 'nvidia/nemotron-3-ultra-550b-a55b:free',
   qa: 'recursive/flint-v1.0:free',
   security: 'inclusionai/ling-3.2-flash:free',
 };
